@@ -23,6 +23,8 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -30,6 +32,7 @@ import java.io.IOException;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     public static final int TAKE_PHOTO = 1;
     public static final int CHOOSE_PHOTO = 2;
+    private String uploadFileName; //图片文件
     private ImageView ivPicture;
     private Uri imageUri;
     private Button btnTakePhoto;
@@ -130,20 +133,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     //选择后照片的读取工作
     private void handleSelect(Intent intent){
-        Cursor cursor=null;
-        Uri uri=intent.getData();
-        //如果直接是从"相册"中选择，则Uri的形式是"content://xxxx"的形式
-        if("content".equalsIgnoreCase(uri.getScheme())){
-            cursor= getContentResolver().query(uri,null,null,null,null);
-            if(cursor.moveToFirst()){
-                int columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-                String path=cursor.getString(columnIndex);
-                Bitmap bitmap= BitmapFactory.decodeFile(path);
-                ivPicture.setImageBitmap(bitmap);
-            }
+        Cursor cursor = null;
+        Uri uri = intent.getData();
+        cursor = getContentResolver().query(uri, null, null, null, null);
+        if (cursor.moveToFirst()) {
+            int columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME);
+            uploadFileName = cursor.getString(columnIndex);
         }
-        else{
-            Log.i("other","其它数据类型.....");
+        try {
+            Glide.with(this).load(uri)
+                    .fitCenter()
+                    .into(ivPicture);
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         cursor.close();
     }
