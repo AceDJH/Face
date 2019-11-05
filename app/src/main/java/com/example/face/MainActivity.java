@@ -24,19 +24,31 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.example.face.util.GetTest;
+import com.example.face.util.UploadImage;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+    private String testHttp = "Http________";
+
     public static final int TAKE_PHOTO = 1;
     public static final int CHOOSE_PHOTO = 2;
-    private String uploadFileName; //图片文件
+    private boolean isPhoto = false;
+    private boolean isAlbum = false;
+    private String fileName; //图片名，并非路径
+    private byte[] fileBuf;//图片字节流
     private ImageView ivPicture;
     private Uri imageUri;
     private Button btnTakePhoto;
     private Button btnFromAlbum;
+    private Button btnUpload;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,15 +56,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
         btnTakePhoto = findViewById(R.id.btn_photo);
         btnFromAlbum = findViewById(R.id.btn_choose_from_album);
+        btnUpload = findViewById(R.id.btn_upload);
         ivPicture = findViewById(R.id.iv_picture);
         btnTakePhoto.setOnClickListener(this);
         btnFromAlbum.setOnClickListener(this);
+        btnUpload.setOnClickListener(this);
     }
 
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btn_photo:
+                isPhoto = true;
                 File outputImage = new File(getExternalCacheDir(), "output_image.jpg");
                 try {
                     if (outputImage.exists()) {
@@ -65,6 +80,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (Build.VERSION.SDK_INT >= 24) {
 //                    与manifest中的配置相关
                     imageUri = FileProvider.getUriForFile(MainActivity.this, "com.example.face.fileprovider", outputImage);
+                    Log.d("点击照相后图片的uri___", String.valueOf(imageUri));
                 } else {
                     imageUri = Uri.fromFile(outputImage);
                 }
@@ -73,7 +89,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 startActivityForResult(intent, TAKE_PHOTO);
                 break;
             case R.id.btn_choose_from_album:
+                isAlbum = true;
                 select();
+                break;
+            case R.id.btn_upload:
+                if (isPhoto || isAlbum){
+                    UploadImage.upload(NetAddress.uploadUrl, fileName, fileBuf);
+                }else{
+                    Toast.makeText(this, "请先拍照或使用相册", Toast.LENGTH_SHORT).show();
+                }
+                break;
             default:
                 break;
         }
@@ -85,19 +110,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case TAKE_PHOTO:
                 if (resultCode == RESULT_OK) {
                     try {
+                        InputStream inputStream = getContentResolver().openInputStream(imageUri);
+                        fileBuf = convertToBytes(inputStream);
+                        Log.d("点击照相后图片的fileBuf___", String.valueOf(fileBuf));
                         Bitmap bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
                         ivPicture.setImageBitmap(bitmap);
+//                        时间格式化格式
+                        SimpleDateFormat simpleDateFormat =new SimpleDateFormat("yyyyMMddHHmmssSSS");
+//                        获取当前时间并作为时间戳给文件夹命名
+                        String timeStamp=simpleDateFormat.format(new Date());
+//                        通过时间戳给照片命名
+                        fileName = timeStamp + ".jpg";
+                        Log.d("点击照相后图片的图片名___", fileName);
                     } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
+                break;
             case CHOOSE_PHOTO:
                 handleSelect(data);
+                break;
             default:
                 break;
         }
     }
 
+    //从相册中选择照片
     public void select() {
         String[] permissions=new String[]{
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -138,17 +178,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         cursor = getContentResolver().query(uri, null, null, null, null);
         if (cursor.moveToFirst()) {
             int columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME);
-            uploadFileName = cursor.getString(columnIndex);
+            fileName = cursor.getString(columnIndex);
+            //D/handleSelect___uploadFileName: IMG_20191104_102111.jpg,因此这只是图片名，不是路径
+            Log.d("handleSelect___uploadFileName", fileName);//D/handleSelect___uploadFileName: IMG_20191104_102111.jpg
         }
         try {
+            InputStream inputStream = getContentResolver().openInputStream(uri);
+            fileBuf=convertToBytes(inputStream);
             Glide.with(this).load(uri)
                     .fitCenter()
                     .into(ivPicture);
-
         } catch (Exception e) {
             e.printStackTrace();
         }
         cursor.close();
     }
+
+    //输入流转换为字节流
+    private byte[] convertToBytes(InputStream inputStream) throws Exception{
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[1024];
+        int len = 0;
+        while ((len = inputStream.read(buf)) > 0) {
+            out.write(buf, 0, len);
+        }
+        out.close();
+        inputStream.close();
+        return  out.toByteArray();
+    }
+
 }
 
