@@ -1,0 +1,37 @@
+[uwsgi]
+
+
+# uwsgi 启动时所使用的地址与端口
+
+socket = 127.0.0.1:8001 # 可以使用其他端口
+
+#http = 114.55.37.249:80   #http监听
+
+# 指向网站目录
+
+chdir = /var/www/face
+
+
+# python 启动程序文件
+
+wsgi-file = face_server.py 
+
+
+# python 程序内用以启动的 application 变量名
+
+callable = app 
+
+
+# 处理器数
+
+processes = 4
+
+
+# 线程数
+
+threads = 2
+
+
+#状态检测地址
+
+stats = 127.0.0.1:5000
