@@ -24,7 +24,7 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
-import com.example.face.util.GetTest;
+import com.example.face.util.PictureCompressUtil;
 import com.example.face.util.UploadImage;
 
 import java.io.ByteArrayOutputStream;
@@ -36,14 +36,13 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
-    private String testHttp = "Http________";
-
     public static final int TAKE_PHOTO = 1;
     public static final int CHOOSE_PHOTO = 2;
     private boolean isPhoto = false;
     private boolean isAlbum = false;
     private String fileName; //图片名，并非路径
     private byte[] fileBuf;//图片字节流
+    private final double compressRatio = 0.1;//图片缩放比例0-1
     private ImageView ivPicture;
     private Uri imageUri;
     private Button btnTakePhoto;
@@ -110,17 +109,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case TAKE_PHOTO:
                 if (resultCode == RESULT_OK) {
                     try {
-                        InputStream inputStream = getContentResolver().openInputStream(imageUri);
-                        fileBuf = convertToBytes(inputStream);
-                        Log.d("点击照相后图片的fileBuf___", String.valueOf(fileBuf));
                         Bitmap bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
                         ivPicture.setImageBitmap(bitmap);
-//                        时间格式化格式
-                        SimpleDateFormat simpleDateFormat =new SimpleDateFormat("yyyyMMddHHmmssSSS");
-//                        获取当前时间并作为时间戳给文件夹命名
-                        String timeStamp=simpleDateFormat.format(new Date());
-//                        通过时间戳给照片命名
-                        fileName = timeStamp + ".jpg";
+                        fileName = makePictureName();
+//                        Bitmap compressBitmap = PictureCompressUtil.ratio(bitmap, pixelW, pixelH);
+                        Bitmap compressBitmap = PictureCompressUtil.ratio(bitmap, bitmap.getWidth() * compressRatio, bitmap.getHeight() * compressRatio);
+                        fileBuf = PictureCompressUtil.Bitmap2Bytes(compressBitmap);
                         Log.d("点击照相后图片的图片名___", fileName);
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
@@ -173,39 +167,31 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     //选择后照片的读取工作
     private void handleSelect(Intent intent){
-        Cursor cursor = null;
-        Uri uri = intent.getData();
-        cursor = getContentResolver().query(uri, null, null, null, null);
-        if (cursor.moveToFirst()) {
-            int columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME);
-            fileName = cursor.getString(columnIndex);
-            //D/handleSelect___uploadFileName: IMG_20191104_102111.jpg,因此这只是图片名，不是路径
-            Log.d("handleSelect___uploadFileName", fileName);//D/handleSelect___uploadFileName: IMG_20191104_102111.jpg
-        }
+        imageUri = intent.getData();
         try {
-            InputStream inputStream = getContentResolver().openInputStream(uri);
-            fileBuf=convertToBytes(inputStream);
-            Glide.with(this).load(uri)
+            fileName = makePictureName();
+            Bitmap bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
+//            Log.d("bitmap___压缩前", String.valueOf(bitmap.getByteCount()/1024));
+//            Bitmap compressBitmap = PictureCompressUtil.ratio(bitmap, pixelW, pixelH);
+            Bitmap compressBitmap = PictureCompressUtil.ratio(bitmap, bitmap.getWidth() * compressRatio, bitmap.getHeight() * compressRatio);
+//            Log.d("bitmap___压缩后", String.valueOf(compressBitmap.getByteCount()/1024));
+            fileBuf = PictureCompressUtil.Bitmap2Bytes(compressBitmap);
+            Glide.with(this).load(imageUri)
                     .fitCenter()
                     .into(ivPicture);
         } catch (Exception e) {
             e.printStackTrace();
         }
-        cursor.close();
     }
 
-    //输入流转换为字节流
-    private byte[] convertToBytes(InputStream inputStream) throws Exception{
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buf = new byte[1024];
-        int len = 0;
-        while ((len = inputStream.read(buf)) > 0) {
-            out.write(buf, 0, len);
-        }
-        out.close();
-        inputStream.close();
-        return  out.toByteArray();
+    //给图片命名
+    private String makePictureName(){
+//        时间格式化格式
+        SimpleDateFormat simpleDateFormat =new SimpleDateFormat("yyyyMMddHHmmssSSS");
+//        获取当前时间并作为时间戳给文件夹命名
+        String timeStamp=simpleDateFormat.format(new Date());
+//        通过时间戳给照片命名
+        return timeStamp + ".jpg";
     }
-
 }
 
