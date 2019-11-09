@@ -24,6 +24,7 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.example.face.util.GetTest;
 import com.example.face.util.PictureCompressUtil;
 import com.example.face.util.UploadImage;
 
@@ -38,8 +39,6 @@ import java.util.Date;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     public static final int TAKE_PHOTO = 1;
     public static final int CHOOSE_PHOTO = 2;
-    private boolean isPhoto = false;
-    private boolean isAlbum = false;
     private String fileName; //图片名，并非路径
     private byte[] fileBuf;//图片字节流
     private final double compressRatio = 0.1;//图片缩放比例0-1
@@ -66,7 +65,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btn_photo:
-                isPhoto = true;
                 File outputImage = new File(getExternalCacheDir(), "output_image.jpg");
                 try {
                     if (outputImage.exists()) {
@@ -88,11 +86,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 startActivityForResult(intent, TAKE_PHOTO);
                 break;
             case R.id.btn_choose_from_album:
-                isAlbum = true;
                 select();
                 break;
             case R.id.btn_upload:
-                if (isPhoto || isAlbum){
+                if (ivPicture.getDrawable() != null){
+//                    GetTest.getTest(NetAddress.url);
                     UploadImage.upload(NetAddress.uploadUrl, fileName, fileBuf);
                 }else{
                     Toast.makeText(this, "请先拍照或使用相册", Toast.LENGTH_SHORT).show();
@@ -168,6 +166,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     //选择后照片的读取工作
     private void handleSelect(Intent intent){
         imageUri = intent.getData();
+
         try {
             fileName = makePictureName();
             Bitmap bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
