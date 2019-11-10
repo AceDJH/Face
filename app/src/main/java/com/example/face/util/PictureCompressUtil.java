@@ -156,8 +156,8 @@ public class PictureCompressUtil {
      * @return
      */
     public static Bitmap ratio(Bitmap bm, double pixelW, double pixelH) {
-        //bitmap大小小于1M，则直接返回，不需要压缩
-        if (bm.getByteCount() < 1024){
+        //bitmap大小小于512kb，则直接返回，不需要压缩
+        if (bm.getByteCount() < 512){
             return bm;
         }
         ByteArrayOutputStream os = new ByteArrayOutputStream();

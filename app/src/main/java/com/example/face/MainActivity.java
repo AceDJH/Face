@@ -10,7 +10,6 @@ import androidx.core.content.FileProvider;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -19,22 +18,33 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
-import com.example.face.util.GetTest;
+import com.example.face.adapter.Thing;
+import com.example.face.adapter.ThingAdapter;
+import com.example.face.bean.GeneralRecognitionBean;
+import com.example.face.bean.Result;
 import com.example.face.util.PictureCompressUtil;
-import com.example.face.util.UploadImage;
+import com.example.face.util.UploadImageUtil;
+import com.google.gson.Gson;
 
-import java.io.ByteArrayOutputStream;
+import org.jetbrains.annotations.NotNull;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+
+import okhttp3.Call;
+import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     public static final int TAKE_PHOTO = 1;
@@ -42,11 +52,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private String fileName; //图片名，并非路径
     private byte[] fileBuf;//图片字节流
     private final double compressRatio = 0.1;//图片缩放比例0-1
+    private List<Thing> thingList = new ArrayList<>();
+    private List<Result> result = null;
     private ImageView ivPicture;
     private Uri imageUri;
     private Button btnTakePhoto;
     private Button btnFromAlbum;
     private Button btnUpload;
+    private ListView lvThings;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +69,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btnFromAlbum = findViewById(R.id.btn_choose_from_album);
         btnUpload = findViewById(R.id.btn_upload);
         ivPicture = findViewById(R.id.iv_picture);
+        lvThings = findViewById(R.id.lv_things);
         btnTakePhoto.setOnClickListener(this);
         btnFromAlbum.setOnClickListener(this);
         btnUpload.setOnClickListener(this);
@@ -91,7 +105,43 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.btn_upload:
                 if (ivPicture.getDrawable() != null){
 //                    GetTest.getTest(NetAddress.url);
-                    UploadImage.upload(NetAddress.uploadUrl, fileName, fileBuf);
+                    UploadImageUtil.upload(NetAddress.uploadUrl, fileName, fileBuf, new okhttp3.Callback(){
+                        @Override
+                        public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+                            String jsonData = response.body().string();
+                            Gson gson = new Gson();
+                            //百度大脑返回的数据
+                            GeneralRecognitionBean generalRecognitionBean = gson.fromJson(jsonData, GeneralRecognitionBean.class);
+                            initThings(generalRecognitionBean);
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    ThingAdapter thingAdapter = new ThingAdapter(MainActivity.this, R.layout.item_thing, thingList);
+                                    lvThings.setAdapter(thingAdapter);
+                                    lvThings.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                                        @Override
+                                        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                                            Intent toThingIntent = new Intent(MainActivity.this, ThingActivity.class);
+                                            toThingIntent.putExtra("keyword", result.get(position).getKeyword());
+                                            toThingIntent.putExtra("root", result.get(position).getRoot());
+                                            toThingIntent.putExtra("baike", result.get(position).getBaike_info().getDescription());
+                                            toThingIntent.putExtra("imageUrl", result.get(position).getBaike_info().getImage_url());
+                                            startActivity(toThingIntent);
+                                        }
+                                    });
+                                }
+                            });
+
+                            //成功, 面条
+//                            Log.d("Things___", thingList.get(0).getKeyword());
+                        }
+
+                        @Override
+                        public void onFailure(@NotNull Call call, @NotNull IOException e) {
+
+                        }
+                    });
                 }else{
                     Toast.makeText(this, "请先拍照或使用相册", Toast.LENGTH_SHORT).show();
                 }
@@ -191,6 +241,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         String timeStamp=simpleDateFormat.format(new Date());
 //        通过时间戳给照片命名
         return timeStamp + ".jpg";
+    }
+
+    private void initThings(GeneralRecognitionBean generalRecognitionBean){
+        if (result != null){
+            result.clear();
+        }
+        thingList.clear();
+        result = generalRecognitionBean.getResult();
+        String keyword;
+        String score;
+        //只取前3个数据，因为服务器中只要了前3个的百科数据
+        for (int i = 0; i < 3; i++){
+            keyword = result.get(i).getKeyword();
+            score = String.valueOf(result.get(i).getScore());
+            Thing thing = new Thing(keyword, score);
+            thingList.add(thing);
+        }
     }
 }
 
